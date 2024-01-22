@@ -42,13 +42,11 @@ class BaseSignal(BaseSignalT[T]):
     def __init__(self, *,
                  name: str = None,
                  owner: Type = None,
-                 loop: asyncio.AbstractEventLoop = None,
                  default_sender: Any = None,
                  receivers: MutableSet[SignalHandlerRefT] = None,
                  filter_receivers: FilterReceiverMapping = None) -> None:
         self.name = name or ''
         self.owner = owner
-        self.loop = loop
         self.default_sender = default_sender
         self._receivers = receivers if receivers is not None else set()
         if filter_receivers is None:
@@ -59,7 +57,6 @@ class BaseSignal(BaseSignalT[T]):
         return {
             'name': self.name,
             'owner': self.owner,
-            'loop': self.loop,
             'default_sender': self.default_sender,
         }
 

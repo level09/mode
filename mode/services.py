@@ -110,7 +110,6 @@ class ServiceBase(ServiceT):
 
     def __init__(self) -> None:
         self.log = CompositeLogger(self.logger, formatter=self._format_log)
-        self._loop = loop
 
     def _format_log(self, severity: int, msg: str,
                     *args: Any, **kwargs: Any) -> str:
@@ -729,8 +728,7 @@ class Service(ServiceBase, ServiceCallbacks):
         done, pending = await asyncio.wait(
             [stopped, crashed],
             return_when=asyncio.FIRST_COMPLETED,
-            timeout=timeout,
-            loop=self.loop,
+            timeout=timeout
         )
         for fut in done:
             fut.result()  # propagate exceptions

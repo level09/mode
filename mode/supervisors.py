@@ -117,7 +117,7 @@ class SupervisorStrategy(Service, SupervisorStrategyT):
         while not self.should_stop:
             # other coroutines may set this future to wake us up using
             # notify(self._please_wakeup)
-            self._please_wakeup = asyncio.Future(loop=self.loop)
+            self._please_wakeup = asyncio.Future()
             try:
                 # we'll also timeout after five seconds,
                 # just in case nobody wakes us up.
@@ -168,7 +168,6 @@ class SupervisorStrategy(Service, SupervisorStrategyT):
         # Stop them all simultaneously.
         await asyncio.gather(
             *[service.stop() for service in services],
-            loop=self.loop,
         )
 
     async def restart_service(self, service: ServiceT) -> None:
