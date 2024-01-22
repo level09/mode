@@ -28,7 +28,7 @@ if sys.platform == 'win32':
 else:
     TIME_MONOTONIC = time.monotonic
 
-#: Seconds can be expressed as float or :class:`~datetime.timedelta`,
+#: Seconds can be expressed as float or :class:`~datetime.timedelta`,  
 Seconds = Union[timedelta, float, str]
 
 
@@ -51,12 +51,12 @@ RATE_MODIFIER_MAP: Mapping[str, Callable[[float], float]] = {
     's': lambda n: n,
     'm': lambda n: n / 60.0,
     'h': lambda n: n / 60.0 / 60.0,
-    'd': lambda n: n / 60.0 / 60.0 / 24,
+    'd': lambda n: n / 60.0 / 60.0 / 24,  
 }
 
 
 class Bucket(AsyncContextManager):
-    """Rate limiting state.
+    """Rate limiting state.  
 
     A bucket "pours" tokens at a rate of ``rate`` per second (or over').
 
@@ -81,10 +81,10 @@ class Bucket(AsyncContextManager):
         async with bucket:
             # do something
 
-    By default the async. context manager will suspend the current coroutine
+    By default the async. context manager will suspend the current coroutine 
     and sleep until as soon as the time that a token can be consumed.
 
-    If you wish you can also raise an exception, instead of sleeping, by
+    If you wish you can also raise an exception, instead of sleeping, by  
     providing the ``raises`` keyword argument::
 
         # hundred tokens in one second, and async with: raises TimeoutError
@@ -92,7 +92,7 @@ class Bucket(AsyncContextManager):
         class MyError(Exception):
             pass
 
-        bucket = Bucket(100, over=1.0, raises=MyError)
+        bucket = Bucket(100, over=1.0, raises=MyError)  
 
         async with bucket:
             # do something
@@ -104,16 +104,14 @@ class Bucket(AsyncContextManager):
 
     _tokens: float
 
-    def __init__(self, rate: Seconds, over: Seconds = 1.0,
+    def __init__(self, rate: Seconds, over: Seconds = 1.0,  
                  *,
                  fill_rate: Seconds = None,
                  capacity: Seconds = None,
-                 raises: Type[BaseException] = None,
-                 loop: asyncio.AbstractEventLoop = None) -> None:
+                 raises: Type[BaseException] = None) -> None:
         self.rate = want_seconds(rate)
-        self.capacity = want_seconds(over)
-        self.raises = raises
-        self.loop = loop
+        self.capacity = want_seconds(over) 
+        self.raises = raises  
         self._tokens = self.capacity
         self.__post_init__()
 
@@ -125,7 +123,7 @@ class Bucket(AsyncContextManager):
         ...
 
     @abc.abstractmethod
-    def expected_time(self, tokens: int = 1) -> float:
+    def expected_time(self, tokens: int = 1) -> float:  
         ...
 
     @property
@@ -135,8 +133,8 @@ class Bucket(AsyncContextManager):
 
     @property
     def fill_rate(self) -> float:
-        #: Defaults to rate! If you want the bucket to fill up
-        #: faster/slower, then just override this.
+        #: Defaults to rate! If you want the bucket to fill up  
+        #: faster/slower, then just override this. 
         return self.rate
 
     async def __aenter__(self) -> 'Bucket':
@@ -144,12 +142,12 @@ class Bucket(AsyncContextManager):
             if self.raises:
                 raise self.raises()
             expected_time = self.expected_time()
-            await asyncio.sleep(expected_time, loop=self.loop)
+            await asyncio.sleep(expected_time)
         return self
 
     async def __aexit__(self,
                         exc_type: Type[BaseException] = None,
-                        exc_val: BaseException = None,
+                        exc_val: BaseException = None, 
                         exc_tb: TracebackType = None) -> Optional[bool]:
         return None
 
@@ -164,17 +162,17 @@ class TokenBucket(Bucket):
         self._last_pour = TIME_MONOTONIC()
 
     def pour(self, tokens: int = 1) -> bool:
-        need = tokens
+        need = tokens  
         have = self.tokens
         if have < need:
-            return False
+            return False 
         self._tokens -= tokens
         return True
 
     def expected_time(self, tokens: int = 1) -> float:
         have = self._tokens
         need = max(tokens, have)
-        time_left = (need - have) / self.fill_rate
+        time_left = (need - have) / self.fill_rate 
         return max(time_left, 0.0)
 
     @property
@@ -189,13 +187,13 @@ class TokenBucket(Bucket):
         return self._tokens
 
 
-@singledispatch
+@singledispatch  
 def rate(r: float) -> float:
     """Convert rate string (`"100/m"`, `"2/h"` or `"0.5/s"`) to seconds."""
     return r
 
 
-@rate.register(str)
+@rate.register(str) 
 def _rate_str(r: str) -> float:  # noqa: F811
     ops, _, modifier = r.partition('/')
     return RATE_MODIFIER_MAP[modifier or 's'](float(ops)) or 0
@@ -206,18 +204,17 @@ def _rate_int(r: int) -> float:
     return float(r)
 
 
-@rate.register(type(None))  # noqa: F811
+@rate.register(type(None))  # noqa: F811  
 def _rate_None(r: None) -> float:
     return 0.0
 
 
-def rate_limit(rate: float, over: Seconds = 1.0,
+def rate_limit(rate: float, over: Seconds = 1.0,  
                *,
-               bucket_type: Type[Bucket] = TokenBucket,
-               raises: Type[BaseException] = None,
-               loop: asyncio.AbstractEventLoop = None) -> Bucket:
+               bucket_type: Type[Bucket] = TokenBucket, 
+               raises: Type[BaseException] = None) -> Bucket:
     """Create rate limiting manager."""
-    return bucket_type(rate, over, raises=raises, loop=loop)
+    return bucket_type(rate, over, raises=raises)
 
 
 @singledispatch
@@ -236,7 +233,7 @@ def _want_seconds_timedelta(s: timedelta) -> float:
     return s.total_seconds()
 
 
-def humanize_seconds(secs: float, *,
+def humanize_seconds(secs: float, *,  
                      prefix: str = '',
                      suffix: str = '',
                      sep: str = '',
@@ -249,7 +246,7 @@ def humanize_seconds(secs: float, *,
     Arguments:
         secs: Seconds to format (as :class:`float` or :class:`int`).
         prefix (str): can be used to add a preposition to the output
-            (e.g., 'in' will give 'in 1 second', but add nothing to 'now').
+            (e.g., 'in' will give 'in 1 second', but add nothing to 'now'). 
         suffix (str): same as prefix, adds suffix unless 'now'.
         sep (str): separator between prefix and number.
         now (str): Literal 'now'.
@@ -260,7 +257,7 @@ def humanize_seconds(secs: float, *,
         if secs >= divider:
             w = secs / float(divider)
             return '{0}{1}{2} {3}{4}'.format(
-                prefix, sep, formatter(w),
+                prefix, sep, formatter(w), 
                 pluralize(int(w), unit), suffix)
     if microseconds and secs > 0.0:
         return '{prefix}{sep}{0:.2f} seconds{suffix}'.format(
@@ -268,13 +265,13 @@ def humanize_seconds(secs: float, *,
     return now
 
 
-def humanize_seconds_ago(secs: float, *,
+def humanize_seconds_ago(secs: float, *,    
                          prefix: str = '',
-                         suffix: str = ' ago',
+                         suffix: str = ' ago', 
                          sep: str = '',
                          now: str = 'just now',
                          microseconds: bool = False) -> str:
-    """Show seconds in "3.33 seconds ago" form.
+    """Show seconds in "3.33 seconds ago" form.  
 
     If seconds are less than one, returns "just now".
     """
