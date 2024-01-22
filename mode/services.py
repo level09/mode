@@ -108,7 +108,7 @@ class ServiceBase(ServiceT):
             _logger = cls.logger = get_logger(cls.__module__)
             _logger.__modex__ = True  # type: ignore
 
-    def __init__(self, *, loop: asyncio.AbstractEventLoop = None) -> None:
+    def __init__(self) -> None:
         self.log = CompositeLogger(self.logger, formatter=self._format_log)
         self._loop = loop
 
@@ -141,15 +141,7 @@ class ServiceBase(ServiceT):
     def _repr_name(self) -> str:
         return type(self).__name__
 
-    @property
-    def loop(self) -> asyncio.AbstractEventLoop:
-        if self._loop is None:
-            self._loop = asyncio.get_event_loop()
-        return self._loop
-
-    @loop.setter
-    def loop(self, loop: Optional[asyncio.AbstractEventLoop]) -> None:
-        self._loop = loop
+   
 
 
 class Diag(DiagT):
@@ -506,10 +498,8 @@ class Service(ServiceBase, ServiceCallbacks):
         return '.'.join([cls.__module__, cls.__qualname__])
 
     def __init__(self, *,
-                 beacon: NodeT = None,
-                 loop: asyncio.AbstractEventLoop = None) -> None:
+                 beacon: NodeT = None) -> None:
         self.diag = self.Diag(self)
-        self._loop = loop
         self._started = self._new_started_event()
         self._stopped = self._new_stopped_event()
         self._shutdown = self._new_shutdown_event()
@@ -523,19 +513,19 @@ class Service(ServiceBase, ServiceCallbacks):
         self.exit_stack = ExitStack()
         self.on_init()
         self.__post_init__()
-        super().__init__(loop=self._loop)
+        super().__init__()
 
     def _new_started_event(self) -> Event:
-        return Event(loop=self._loop)
+        return Event()
 
     def _new_stopped_event(self) -> Event:
-        return Event(loop=self._loop)
+        return Event()
 
     def _new_shutdown_event(self) -> Event:
-        return Event(loop=self._loop)
+        return Event()
 
     def _new_crashed_event(self) -> Event:
-        return Event(loop=self._loop)
+        return Event()
 
     async def transition_with(self, flag: str, fut: Awaitable,
                               *args: Any, **kwargs: Any) -> Any:
@@ -590,7 +580,7 @@ class Service(ServiceBase, ServiceCallbacks):
 
         The future will be joined when this service is stopped.
         """
-        fut = asyncio.ensure_future(self._execute_task(coro), loop=self.loop)
+        fut = asyncio.ensure_future(self._execute_task(coro))
         try:
             fut.set_name(repr(coro))  # type: ignore
         except AttributeError:
@@ -645,14 +635,12 @@ class Service(ServiceBase, ServiceCallbacks):
         for service in reversed(services):
             await service.stop()
 
-    async def sleep(self, n: Seconds, *,
-                    loop: asyncio.AbstractEventLoop = None) -> None:
+    async def sleep(self, n: Seconds, *) -> None:
         """Sleep for ``n`` seconds, or until service stopped."""
         try:
             await asyncio.wait_for(
                 self._stopped.wait(),
-                timeout=want_seconds(n),
-                loop=loop or self.loop,
+                timeout=want_seconds(n)
             )
         except asyncio.TimeoutError:
             pass
@@ -677,8 +665,7 @@ class Service(ServiceBase, ServiceCallbacks):
         coro = asyncio.wait(
             cast(Iterable[Awaitable[Any]], coros),
             return_when=asyncio.ALL_COMPLETED,
-            timeout=want_seconds(timeout),
-            loop=self.loop,
+            timeout=want_seconds(timeout)
         )
         return await self._wait_one(coro, timeout=timeout)
 
@@ -688,27 +675,23 @@ class Service(ServiceBase, ServiceCallbacks):
         timeout = want_seconds(timeout) if timeout is not None else None
         stopped = self._stopped
         crashed = self._crashed
-        loop = self.loop
 
         # asyncio.wait will also ensure_future, but we need the handle
         # so we can cancel them (if we don't they will leak).
         futures = {
             coro: asyncio.ensure_future(
-                (coro.wait() if isinstance(coro, EVENT_TYPES) else coro),
-                loop=loop,
-            )
+                (coro.wait() if isinstance(coro, EVENT_TYPES) else coro)            )
             for coro in coros
         }
-        futures[stopped] = asyncio.ensure_future(stopped.wait(), loop=loop)
-        futures[crashed] = asyncio.ensure_future(crashed.wait(), loop=loop)
+        futures[stopped] = asyncio.ensure_future(stopped.wait())
+        futures[crashed] = asyncio.ensure_future(crashed.wait())
         done: Set[asyncio.Future]
         pending: Set[asyncio.Future]
         try:
             done, pending = await asyncio.wait(
                 futures.values(),
                 return_when=asyncio.FIRST_COMPLETED,
-                timeout=timeout,
-                loop=self.loop,
+                timeout=timeout
             )
             for f in done:
                 if f.done() and f.exception() is not None:
@@ -759,8 +742,6 @@ class Service(ServiceBase, ServiceCallbacks):
         await self._default_start()
 
     async def _default_start(self) -> None:
-        loop = self.loop
-        assert loop  # make sure loop is set
         assert not self._started.is_set()
         self._started.set()
         await self._actually_start()
@@ -935,8 +916,7 @@ class Service(ServiceBase, ServiceCallbacks):
             await asyncio.wait(
                 self._futures,
                 return_when=asyncio.ALL_COMPLETED,
-                loop=self.loop,
-                timeout=timeout,
+                timeout=timeout
             )
 
     async def restart(self) -> None:
@@ -974,7 +954,6 @@ class Service(ServiceBase, ServiceCallbacks):
     async def itertimer(self,
                         interval: Seconds, *,
                         max_drift_correction: float = 0.1,
-                        loop: asyncio.AbstractEventLoop = None,
                         sleep: Callable[..., Awaitable] = None,
                         clock: ClockArg = perf_counter,
                         name: str = '') -> AsyncIterator[float]:
@@ -1092,7 +1071,7 @@ class _AwaitableService(Service):
     async def on_start(self) -> None:
         # convert to future, so we can cancel on_stop
         try:
-            self._fut = asyncio.ensure_future(self.coro, loop=self.loop)
+            self._fut = asyncio.ensure_future(self.coro)
             await self._fut
         except asyncio.CancelledError:
             if not self.should_stop:
